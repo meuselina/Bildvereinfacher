@@ -36,7 +36,24 @@ public class BildVereinfacher {
 
         File eingabe = new File(args[0]);
         File ausgabe = new File(args[1]);
-        int toleranz = args.length > 2 ? Integer.parseInt(args[2]) : 32;
+        if (!eingabe.isFile()) {
+            System.out.println("Fehler: Die Datei '" + eingabe + "' wurde nicht gefunden.");
+            return;
+        }
+
+        int toleranz = 32;
+        if (args.length > 2) {
+            try {
+                toleranz = Integer.parseInt(args[2]);
+            } catch (NumberFormatException e) {
+                System.out.println("Fehler: Die Toleranz muss eine ganze Zahl sein, z. B. 32.");
+                return;
+            }
+            if (toleranz < 0 || toleranz > 255) {
+                System.out.println("Fehler: Die Toleranz muss zwischen 0 und 255 liegen.");
+                return;
+            }
+        }
 
         BufferedImage original = ImageIO.read(eingabe);
         if (original == null) {
@@ -48,7 +65,7 @@ public class BildVereinfacher {
         int farbenVorher = zaehleFarben(rgb);
 
         // 1. Palette aus aehnlichen Farben aufbauen
-        List<Integer> palette = ersellePalette(rgb, toleranz);
+        List<Integer> palette = erstellePalette(rgb, toleranz);
 
         // 2. Jeden Pixel auf die passende Palettenfarbe umbiegen
         BufferedImage vereinfacht = wendePaletteAn(rgb, palette);
@@ -69,6 +86,10 @@ public class BildVereinfacher {
                 groesseVorher, groesseNachher,
                 100.0 * (groesseVorher - groesseNachher) / groesseVorher);
         System.out.println("Gespeichert: " + ausgabe.getPath());
+        if (groesseNachher > groesseVorher) {
+            System.out.println("Hinweis: Die neue Datei ist groesser als das Original. Fotos im JPG-Format");
+            System.out.println("sind oft schon stark komprimiert. Probiere eine hoehere Toleranz, z. B. 48 oder 64.");
+        }
     }
 
     /**
@@ -76,7 +97,7 @@ public class BildVereinfacher {
      * nur dann in die Palette aufgenommen, wenn sie zu allen bisherigen
      * Palettenfarben weiter entfernt ist als die Toleranz.
      */
-    private static List<Integer> ersellePalette(BufferedImage bild, int toleranz) {
+    private static List<Integer> erstellePalette(BufferedImage bild, int toleranz) {
         Map<Integer, Integer> haeufigkeit = new HashMap<>();
         for (int y = 0; y < bild.getHeight(); y++) {
             for (int x = 0; x < bild.getWidth(); x++) {
@@ -87,6 +108,13 @@ public class BildVereinfacher {
 
         List<Integer> sortiert = new ArrayList<>(haeufigkeit.keySet());
         sortiert.sort((a, b) -> haeufigkeit.get(b) - haeufigkeit.get(a));
+
+        // Toleranz 0: jede Farbe bleibt erhalten, kein Vergleichen noetig.
+        // (Vorher wurde hier jede Farbe mit jeder verglichen: bei 40.000
+        // Farben ueber eine Milliarde Vergleiche und ca. 25 Sekunden.)
+        if (toleranz == 0) {
+            return sortiert;
+        }
 
         double grenze = (double) toleranz * toleranz;
         List<Integer> palette = new ArrayList<>();
@@ -110,8 +138,12 @@ public class BildVereinfacher {
         BufferedImage ergebnis = new BufferedImage(
                 bild.getWidth(), bild.getHeight(), BufferedImage.TYPE_INT_RGB);
 
-        // Cache, damit gleiche Farben nicht mehrfach gesucht werden
+        // Cache, damit gleiche Farben nicht mehrfach gesucht werden.
+        // Farben, die selbst in der Palette sind, bleiben unveraendert.
         Map<Integer, Integer> cache = new HashMap<>();
+        for (int p : palette) {
+            cache.put(p, p);
+        }
 
         for (int y = 0; y < bild.getHeight(); y++) {
             for (int x = 0; x < bild.getWidth(); x++) {

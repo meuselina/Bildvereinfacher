@@ -2,7 +2,9 @@
 
 A small Java command line tool that makes PNG files smaller by merging similar colors into one shared color (**color quantization**).
 
-Fewer distinct colors means the image can be saved as an indexed PNG, which often cuts the file size dramatically while the picture still looks almost the same.
+Fewer distinct colors means the image can be saved as an indexed PNG, which often cuts the file size dramatically.
+
+![Before and after](example.jpg)
 
 ## How it works
 
@@ -28,6 +30,10 @@ java BildVereinfacher photo.jpg small.png 32
 |---|---|
 | small | many colors, barely visible difference, small savings |
 | large | few colors, poster effect, big savings |
+
+Works best for graphics, screenshots and illustrations. Photos saved as JPG are already heavily compressed, so with a small tolerance the PNG can end up larger. The tool tells you when that happens.
+
+Invalid input (missing file, tolerance that is not a number or outside 0 to 255) is reported with a clear message instead of a crash.
 
 ## Built with
 
